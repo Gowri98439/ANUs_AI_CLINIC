@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🩺 AI Doctor Chatbot</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+<style>
+body { margin:0; font-family:'Roboto',sans-serif; background:linear-gradient(135deg,#c2e9fb,#a1c4fd); display:flex; justify-content:center; align-items:center; height:100vh; transition: background 0.4s; }
+body.dark { background: linear-gradient(135deg,#1a1a1a,#333); color: white; }
+.chat-container{ width:90%; max-width:500px; background:rgba(255,255,255,0.95); border-radius:20px; display:flex; flex-direction:column; box-shadow:0 8px 20px rgba(0,0,0,0.2); overflow:hidden; transition: background 0.4s; }
+body.dark .chat-container { background:rgba(30,30,30,0.95); }
+.header{ background:#4facfe; color:white; padding:10px; font-size:1.2em; text-align:center; display:flex; align-items:center; justify-content:space-between; }
+.header img{ height:28px; margin-right:6px; }
+.header .title{ display:flex; align-items:center; }
+.header button { background:none; border:none; color:white; cursor:pointer; font-size:1.1em; margin-left:8px; }
+#chat-box{ flex:1; overflow-y:auto; padding:15px; }
+.message{ display:flex; align-items:flex-start; margin:8px 0; }
+.user-text, .bot-text{ padding:10px 14px; border-radius:15px; max-width:70%; font-size:0.95em; word-wrap:break-word; }
+.user .user-text{ background:#4facfe; color:white; margin-left:auto; }
+.bot .bot-text{ background:#e0e0e0; color:#333; margin-right:auto; }
+body.dark .bot .bot-text{ background:#555; color:#eee; }
+.bot img{ width:30px; height:30px; border-radius:50%; margin-right:6px; }
+.input-area{ display:flex; padding:8px; background:#fff; border-top:1px solid #ddd; }
+body.dark .input-area{ background:#222; }
+input[type="text"]{ flex:1; padding:9px; border-radius:20px; border:1px solid #ccc; outline:none; font-size:1em; background:#fff; }
+body.dark input[type="text"]{ background:#333; color:white; border:1px solid #555; }
+button{ background:#4facfe; border:none; color:white; padding:0 13px; margin-left:5px; border-radius:50%; font-size:1.1em; cursor:pointer; transition:background 0.3s; }
+button:hover{ background:#3b89e0; }
+.quick-replies{ display:flex; flex-wrap:wrap; padding:6px; background:#f1f1f1; }
+body.dark .quick-replies{ background:#333; }
+.quick-replies button{ flex:1; margin:4px; border-radius:12px; font-size:0.9em; padding:6px 10px; background:#4facfe; color:white; border:none; cursor:pointer; transition:background 0.3s; }
+.quick-replies button:hover{ background:#3b89e0; }
+</style>
+</head>
+<body>
+<div class="chat-container">
+  <div class="header">
+    <div class="title">
+      <img src="https://i.ibb.co/3R6K88F/doctor-icon.png" alt="Doctor"> AI Health Chatbot
+    </div>
+    <div>
+      <button onclick="toggleDark()">🌙</button>
+      <button onclick="clearChat()">🗑️</button>
+    </div>
+  </div>
+  <div id="chat-box"></div>
+  <div class="quick-replies">
+    <button onclick="quickSend('😊 Hi, how are you?')">😊 Hi</button>
+    <button onclick="quickSend('💊 I have a headache')">💊 Headache</button>
+    <button onclick="quickSend('🤒 I feel feverish')">🤒 Fever</button>
+    <button onclick="quickSend('🏥 What should I do?')">🏥 Advice</button>
+  </div>
+  <div class="input-area">
+    <input type="text" id="user-input" placeholder="Type your question...">
+    <button onclick="startVoice()">🎤</button>
+    <button onclick="sendMessage()">➤</button>
+  </div>
+</div>
+
+<script>
+const doctorAvatar = "https://i.ibb.co/3R6K88F/doctor-icon.png";
+
+window.onload = () => {
+  const saved = JSON.parse(localStorage.getItem('chatHistory')||'[]');
+  saved.forEach(item=> addMessage(item.sender,item.text,false));
+  if(localStorage.getItem('darkMode')==='true') document.body.classList.add('dark');
+};
+
+async function sendMessage(){
+  const input = document.getElementById('user-input');
+  const message = input.value.trim();
+  if (!message) return;
+  addMessage('user', message, true);
+  input.value='';
+  const response = await fetch("/ask",{
+    method:"POST", headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ message })
+  });
+  const data=await response.json();
+  const botText=data.reply;
+  addMessage('bot',botText,true);
+  speak(botText);
+}
+
+function addMessage(sender,text,save){
+  const chatBox=document.getElementById('chat-box');
+  const msgDiv=document.createElement('div');
+  msgDiv.className=`message ${sender}`;
+  if(sender==='bot'){
+    msgDiv.innerHTML=`<img src="${doctorAvatar}" alt="Bot"><div class="bot-text">${text}</div>`;
+  }else{
+    msgDiv.innerHTML=`<div class="user-text">${text}</div>`;
+  }
+  chatBox.appendChild(msgDiv);
+  chatBox.scrollTop=chatBox.scrollHeight;
+  if(save){
+    let history=JSON.parse(localStorage.getItem('chatHistory')||'[]');
+    history.push({sender,text});
+    localStorage.setItem('chatHistory',JSON.stringify(history));
+  }
+}
+
+function speak(text){
+  const utter=new SpeechSynthesisUtterance(text);
+  utter.lang='en-US'; speechSynthesis.speak(utter);
+}
+
+function startVoice(){
+  if(!('webkitSpeechRecognition'in window)){alert('Voice not supported');return;}
+  const recognition=new webkitSpeechRecognition();
+  recognition.lang='en-US'; recognition.start();
+  recognition.onresult=(e)=>{
+    const transcript=e.results[0][0].transcript;
+    document.getElementById('user-input').value=transcript;
+    sendMessage();
+  }
+}
+
+function toggleDark(){
+  document.body.classList.toggle('dark');
+  localStorage.setItem('darkMode',document.body.classList.contains('dark'));
+}
+
+function clearChat(){
+  document.getElementById('chat-box').innerHTML='';
+  localStorage.removeItem('chatHistory');
+}
+
+function quickSend(text){
+  document.getElementById('user-input').value=text;
+  sendMessage();
+}
+</script>
+</body>
+</html>
